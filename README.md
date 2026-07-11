@@ -118,6 +118,13 @@ Die Anwendungslogik lauscht auf eingehende UART-Daten der Fernbedienung hierauf:
 
 Eingehende Bytes werden zu Frames zusammengefasst und auf der Weboberflaeche angezeigt. Ein Frame endet bei Zeilenende oder nach einer kurzen Empfangspause.
 
+## Pairing der Fernbedienung 
+ - Den iFan04 vom Strom trennen.
+ - Eine beliebige Taste auf der RM433-Fernbedienung dauerhaft gedrückt halten.
+ - Den iFan04 wieder mit Strom versorgen, während die Taste weiterhin gedrückt gehalten wird.
+ - Sobald der iFan04 hochfährt, bemerkt der RF-Chip das Dauersignal und sollte die ID der Fernbedienung abspeichern (oft quittiert durch ein Relais-Klicken oder Piepen).  
+ - Die Firmware zeigt die empfangenen Fernbedienungssignale auf der Weboberflaeche an. Die Signale werden in HEX und als lesbare Textdarstellung angezeigt.
+
 ## Naechste Entwicklungsschritte
 
 - Signaldekodierung fuer das konkrete Fernbedienungsprotokoll aufbauen

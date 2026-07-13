@@ -90,6 +90,7 @@ namespace
   constexpr uint32_t kRemoteLowFanHigh = 0x000103;
   constexpr uint32_t kRemoteLowLightToggle = 0x000104;
   constexpr unsigned long kLightEffectStepMs = 20;
+  constexpr float kFanBladeCount = 5.0f;
 
   Config activeConfig = {
       WIFI_SSID,
@@ -612,7 +613,7 @@ namespace
     html += F("<script>let applyTimer=null;function isFormBusy(){const a=document.activeElement;return !!(a&&(a.name==='effect'||a.id==='speed'||a.id==='brightness'||a.id==='strobePauseMs'||a.id==='lightEnabled'||a.id==='rgbR'||a.id==='rgbG'||a.id==='rgbB'));}");
     html += F("function buildEffectQuery(){const checked=document.querySelector(\"input[name='effect']:checked\");const effect=checked?checked.value:'0';return '?effect='+encodeURIComponent(effect)+'&speed='+encodeURIComponent(document.getElementById('speed').value)+'&brightness='+encodeURIComponent(document.getElementById('brightness').value)+'&strobePauseMs='+encodeURIComponent(document.getElementById('strobePauseMs').value)+'&rgbR='+encodeURIComponent(document.getElementById('rgbR').value)+'&rgbG='+encodeURIComponent(document.getElementById('rgbG').value)+'&rgbB='+encodeURIComponent(document.getElementById('rgbB').value)+'&enabled='+(document.getElementById('lightEnabled').checked?'1':'0');}");
     html += F("async function applyEffectsInstant(){const q=buildEffectQuery()+'&ajax=1';await fetch('/effect'+q,{cache:'no-store'});}function scheduleApply(){if(applyTimer){clearTimeout(applyTimer);}applyTimer=setTimeout(()=>{applyEffectsInstant();},140);}function bindInstantControls(){document.querySelectorAll(\"input[name='effect']\").forEach((el)=>el.addEventListener('change',scheduleApply));['speed','brightness','strobePauseMs','rgbR','rgbG','rgbB'].forEach((id)=>{const el=document.getElementById(id);el.addEventListener('input',scheduleApply);el.addEventListener('change',scheduleApply);});document.getElementById('lightEnabled').addEventListener('change',scheduleApply);} ");
-    html += F("async function refresh(){const d=await (await fetch('/api/status')).json();document.getElementById('s').textContent='mode='+d.mode+' ip='+d.ip+' ssid='+d.connectedSsid+' ota='+d.otaHostname+' fan='+d.fanSpeed+' light='+(d.lightEffect?'on':'off')+' effect='+d.effectName+' speed='+d.effectSpeed+' bright='+d.lightBrightness+' rgb='+d.rgbR+','+d.rgbG+','+d.rgbB;document.getElementById('lightState').textContent=d.lightEffect?'ON':'OFF';document.getElementById('effectLabel').textContent=d.effectName;document.getElementById('rfFrame').textContent=d.lastRemoteFrame;document.getElementById('rfCmd').textContent=d.lastRemoteCommand;document.getElementById('uartTail').textContent=d.rawUartTail;if(!isFormBusy()){const selected=document.querySelector(\"input[name='effect'][value='\"+String(d.effectIndex)+\"']\");if(selected){selected.checked=true;}document.getElementById('speed').value=d.effectSpeed;document.getElementById('brightness').value=d.lightBrightness;document.getElementById('strobePauseMs').value=d.strobePauseMs;document.getElementById('rgbR').value=d.rgbR;document.getElementById('rgbG').value=d.rgbG;document.getElementById('rgbB').value=d.rgbB;document.getElementById('lightEnabled').checked=!!d.lightEffect;}}");
+    html += F("async function refresh(){const d=await (await fetch('/api/status')).json();document.getElementById('s').textContent='mode='+d.mode+' ip='+d.ip+' ssid='+d.connectedSsid+' ota='+d.otaHostname+' fan='+d.fanSpeed+' light='+(d.lightEffect?'on':'off')+' effect='+d.effectName+' speed='+d.effectSpeed+' bright='+d.lightBrightness+' rgb='+d.rgbR+','+d.rgbG+','+d.rgbB+' strobe='+Number(d.strobeHz).toFixed(2)+'Hz rpm~'+Number(d.strobeRpm).toFixed(1);document.getElementById('lightState').textContent=d.lightEffect?'ON':'OFF';document.getElementById('effectLabel').textContent=d.effectName;document.getElementById('rfFrame').textContent=d.lastRemoteFrame;document.getElementById('rfCmd').textContent=d.lastRemoteCommand;document.getElementById('uartTail').textContent=d.rawUartTail;if(!isFormBusy()){const selected=document.querySelector(\"input[name='effect'][value='\"+String(d.effectIndex)+\"']\");if(selected){selected.checked=true;}document.getElementById('speed').value=d.effectSpeed;document.getElementById('brightness').value=d.lightBrightness;document.getElementById('strobePauseMs').value=d.strobePauseMs;document.getElementById('rgbR').value=d.rgbR;document.getElementById('rgbG').value=d.rgbG;document.getElementById('rgbB').value=d.rgbB;document.getElementById('lightEnabled').checked=!!d.lightEffect;}}");
     html += F("function applyEffects(){applyEffectsInstant();return false;}setInterval(refresh,1500);window.addEventListener('load',()=>{bindInstantControls();refresh();});</script></head><body>");
     html += F("<section class='card'><h1>Sonoff iFan04</h1><div id='s' class='meta'>loading...</div><div class='controls'><a href='/fan?speed=off'>OFF</a><a href='/fan?speed=low'>1</a><a href='/fan?speed=mid'>2</a><a href='/fan?speed=high'>3</a><a href='/light?state=toggle'>LIGHT TOGGLE</a></div>");
     html += F("<p><strong>Licht:</strong> <span id='lightState' class='mono'>OFF</span> | <strong>Effekt:</strong> <span id='effectLabel' class='mono'>-</span></p>");
@@ -628,6 +629,8 @@ namespace
   {
     const String apName = fallbackApSsidWithChipId();
     const unsigned long uartAgeMs = lastRawUartAtMs == 0 ? 0 : millis() - lastRawUartAtMs;
+    const float strobeHz = gLastStrobePeriodUs > 0 ? (1000000.0f / static_cast<float>(gLastStrobePeriodUs)) : 0.0f;
+    const float strobeRpm = strobeHz > 0.0f ? (strobeHz * 60.0f / kFanBladeCount) : 0.0f;
     String json;
     json.reserve(760);
     json += F("{\"mode\":\"");
@@ -652,6 +655,10 @@ namespace
     json += String(globalBrightness);
     json += F(",\"strobePauseMs\":");
     json += String(strobePauseMs);
+    json += F(",\"strobeHz\":");
+    json += String(strobeHz, 2);
+    json += F(",\"strobeRpm\":");
+    json += String(strobeRpm, 1);
     json += F(",\"rgbR\":");
     json += String(solidRed);
     json += F(",\"rgbG\":");

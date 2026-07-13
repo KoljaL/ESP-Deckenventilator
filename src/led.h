@@ -24,6 +24,7 @@ uint8_t solidBlue = 255;        // 0 bis 255
 bool gEffectRequestsShow = true;
 bool gForceEffectDraw = true;
 uint8_t gLastRenderedEffect = 255;
+uint32_t gLastStrobePeriodUs = 0;
 
 // Interne Hilfsvariablen für Animationen
 uint8_t gHue = 0;
@@ -44,20 +45,56 @@ void setWingPixel(uint8_t wing, uint8_t ledIndex, CRGB color)
 // 0. STROBOSKOP (Zum Finden der RPM)
 void eff_Stroboskop()
 {
-  // Sehr kurzer, scharfer Blitz (nur jede 3. LED für weniger Matsch außen)
-  for (uint8_t w = 0; w < NUM_WINGS; w++)
-  {
-    for (uint8_t i = 0; i < LEDS_PER_WING; i += 3)
-    {
-      setWingPixel(w, i, CRGB::White);
-    }
-  }
-  FastLED.show();
-  delayMicroseconds(1000); // 1 Millisekunde echter Blitz
+  static bool strobeOn = false;
+  static uint32_t strobeOnAtUs = 0;
+  static uint32_t lastFlashStartUs = 0;
+  static uint32_t lastOffAtMs = 0;
 
-  FastLED.clear();
-  FastLED.show();
-  delay(strobePauseMs); // Einstellbare Pause über Variable
+  const uint32_t nowMs = millis();
+  const uint32_t nowUs = micros();
+  const uint32_t offTimeMs = strobePauseMs > 0 ? static_cast<uint32_t>(strobePauseMs) : 0UL;
+
+  if (gForceEffectDraw)
+  {
+    strobeOn = false;
+    lastOffAtMs = nowMs;
+    FastLED.clear();
+    FastLED.show();
+  }
+
+  if (!strobeOn)
+  {
+    if (nowMs - lastOffAtMs < offTimeMs)
+    {
+      return;
+    }
+
+    for (uint8_t w = 0; w < NUM_WINGS; ++w)
+    {
+      for (uint8_t i = 0; i < LEDS_PER_WING; i += 3)
+      {
+        setWingPixel(w, i, CRGB::White);
+      }
+    }
+    FastLED.show();
+
+    strobeOn = true;
+    strobeOnAtUs = nowUs;
+    if (lastFlashStartUs != 0)
+    {
+      gLastStrobePeriodUs = nowUs - lastFlashStartUs;
+    }
+    lastFlashStartUs = nowUs;
+    return;
+  }
+
+  if (nowUs - strobeOnAtUs >= 1000UL)
+  {
+    FastLED.clear();
+    FastLED.show();
+    strobeOn = false;
+    lastOffAtMs = nowMs;
+  }
 }
 
 // 1. ENERGIE-WELLE (Schießt von innen nach außen)

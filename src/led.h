@@ -21,6 +21,9 @@ int strobePauseMs = 80;         // Für Effekt 0 (Stroboskop)
 uint8_t solidRed = 255;         // 0 bis 255
 uint8_t solidGreen = 255;       // 0 bis 255
 uint8_t solidBlue = 255;        // 0 bis 255
+bool gEffectRequestsShow = true;
+bool gForceEffectDraw = true;
+uint8_t gLastRenderedEffect = 255;
 
 // Interne Hilfsvariablen für Animationen
 uint8_t gHue = 0;
@@ -207,8 +210,26 @@ void eff_ZickZack()
 // 11. STATIC RGB (alle LEDs gleiche Mischfarbe)
 void eff_StaticRgb()
 {
+  static bool initialized = false;
+  static uint8_t lastRed = 0;
+  static uint8_t lastGreen = 0;
+  static uint8_t lastBlue = 0;
+
+  if (!gForceEffectDraw && initialized &&
+      lastRed == solidRed &&
+      lastGreen == solidGreen &&
+      lastBlue == solidBlue)
+  {
+    gEffectRequestsShow = false;
+    return;
+  }
+
   const CRGB color(solidRed, solidGreen, solidBlue);
   fill_solid(leds, NUM_LEDS, color);
+  lastRed = solidRed;
+  lastGreen = solidGreen;
+  lastBlue = solidBlue;
+  initialized = true;
 }
 
 typedef void (*EffectFn)();
@@ -260,6 +281,10 @@ void initLEDs()
 
 void updateLEDs()
 {
+  const bool effectChanged = currentEffect != gLastRenderedEffect;
+  gForceEffectDraw = effectChanged;
+  gEffectRequestsShow = true;
+
   // Globale Helligkeit setzen
   FastLED.setBrightness(globalBrightness);
 
@@ -279,10 +304,12 @@ void updateLEDs()
   }
 
   // Stroboskop regelt sein show() selbst für maximales Timing, alle anderen hier:
-  if (currentEffect != 0)
+  if (currentEffect != 0 && gEffectRequestsShow)
   {
     FastLED.show();
   }
+
+  gLastRenderedEffect = currentEffect;
 }
 
 #endif

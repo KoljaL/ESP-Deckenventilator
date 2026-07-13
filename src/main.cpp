@@ -253,7 +253,9 @@ namespace
     }
 
     const unsigned long nowMs = millis();
-    if (lastLightEffectAtMs != 0 && nowMs - lastLightEffectAtMs < kLightEffectStepMs)
+    // Strobe effect (0) needs microsecond-level call frequency for the 1 ms flash window;
+    // skip the step throttle so it runs every loop iteration.
+    if (currentEffect != 0 && lastLightEffectAtMs != 0 && nowMs - lastLightEffectAtMs < kLightEffectStepMs)
     {
       return;
     }
@@ -671,15 +673,9 @@ namespace
     json += relay2State ? F("true") : F("false");
     json += F(",\"relay3\":");
     json += relay3State ? F("true") : F("false");
-    json += F(",\"remoteCommand\":\"");
-    json += jsonEscape(lastRemoteCommand);
-    json += F("\",\"remoteFrame\":\"");
-    json += jsonEscape(lastRemoteFrame);
-    json += F("\",\"uartBytes\":");
+    json += F(",\"uartBytes\":");
     json += String(static_cast<unsigned long>(rawUartByteCount));
-    json += F(",\"uartTail\":\"");
-    json += jsonEscape(rawUartTail);
-    json += F("\",\"uartAgeMs\":");
+    json += F(",\"uartAgeMs\":");
     json += String(uartAgeMs);
     json += F(",\"lastRemoteFrame\":\"");
     json += jsonEscape(lastRemoteFrame);

@@ -225,11 +225,7 @@ void eff_Gewitter()
     {
       setWingPixel(w, i, CRGB::White);
     }
-    // Erzeugt unregelmäßiges Doppelblitzen
-    FastLED.setBrightness(globalBrightness);
-    FastLED.show();
-    delay(random8(20, 60));
-    FastLED.clear();
+    // Flash visible for one frame (~20 ms); no blocking delay needed.
   }
 }
 
@@ -237,7 +233,7 @@ void eff_Gewitter()
 void eff_ZickZack()
 {
   fadeToBlackBy(leds, NUM_LEDS, 50);
-  uint16_t totalMs = millis() * (effectSpeed / 20 + 1);
+  uint32_t totalMs = static_cast<uint32_t>(static_cast<uint64_t>(millis()) * (effectSpeed / 20 + 1));
   uint8_t activeWing = (totalMs / 200) % NUM_WINGS;
   uint8_t activeLed = (totalMs / 10) % LEDS_PER_WING;
 

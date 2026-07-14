@@ -42,33 +42,92 @@ void setWingPixel(uint8_t wing, uint8_t ledIndex, CRGB color)
 // DIE 11 EFFEKTE (MODULAR)
 // ==========================================
 
-// 0. STROBOSKOP (Zum Finden der RPM)
+// // 0. STROBOSKOP (Zum Finden der RPM)
+// void eff_Stroboskop()
+// {
+//   static bool shownOn = false;
+//   static uint32_t lastFlashStartUs = 0;
+
+//   const uint32_t nowUs = micros();
+//   const uint32_t onTimeUs = 1000UL;
+//   const uint32_t offTimeUs = static_cast<uint32_t>(strobePauseMs) * 1000UL;
+//   const uint32_t periodUs = onTimeUs + offTimeUs;
+//   const bool shouldBeOn = periodUs > 0 ? ((nowUs % periodUs) < onTimeUs) : false;
+
+//   if (gForceEffectDraw)
+//   {
+//     shownOn = false;
+//     FastLED.clear();
+//     FastLED.show();
+//     lastFlashStartUs = 0;
+//   }
+
+//   if (shouldBeOn == shownOn)
+//   {
+//     return;
+//   }
+
+//   if (shouldBeOn)
+//   {
+//     for (uint8_t w = 0; w < NUM_WINGS; ++w)
+//     {
+//       for (uint8_t i = 0; i < LEDS_PER_WING; i += 3)
+//       {
+//         setWingPixel(w, i, CRGB::White);
+//       }
+//     }
+//     FastLED.show();
+
+//     if (lastFlashStartUs != 0)
+//     {
+//       gLastStrobePeriodUs = nowUs - lastFlashStartUs;
+//     }
+//     lastFlashStartUs = nowUs;
+//     shownOn = true;
+//     return;
+//   }
+
+//   FastLED.clear();
+//   FastLED.show();
+//   shownOn = false;
+// }
 void eff_Stroboskop()
 {
-  static bool strobeOn = false;
-  static uint32_t strobeOnAtUs = 0;
+  static bool shownOn = false;
+  static uint32_t lastStateChangeUs = 0;
   static uint32_t lastFlashStartUs = 0;
-  static uint32_t lastOffAtMs = 0;
 
-  const uint32_t nowMs = millis();
   const uint32_t nowUs = micros();
-  const uint32_t offTimeMs = strobePauseMs > 0 ? static_cast<uint32_t>(strobePauseMs) : 0UL;
+  const uint32_t onTimeUs = 1000UL;
+  const uint32_t offTimeUs = static_cast<uint32_t>(strobePauseMs) * 1000UL;
 
+  // 1. Reset-Logik
   if (gForceEffectDraw)
   {
-    strobeOn = false;
-    lastOffAtMs = nowMs;
+    shownOn = false;
     FastLED.clear();
     FastLED.show();
+    lastFlashStartUs = 0;
+    lastStateChangeUs = nowUs;
+    gForceEffectDraw = false; // Wichtig: Flag nach dem Ausführen zurücksetzen!
+    return;
   }
 
-  if (!strobeOn)
-  {
-    if (nowMs - lastOffAtMs < offTimeMs)
-    {
-      return;
-    }
+  // 2. Zeitberechnung
+  const uint32_t elapsedUs = nowUs - lastStateChangeUs;
 
+  // Fall A: Wir sind im BLITZ-Modus und die Anschaltzeit ist abgelaufen -> AUSSCHALTEN
+  if (shownOn && (elapsedUs >= onTimeUs))
+  {
+    FastLED.clear();
+    FastLED.show(); // Schaltet die LEDs aus
+    shownOn = false;
+    lastStateChangeUs = nowUs; // Zeitstempel für die Pause startet jetzt
+  }
+  // Fall B: Wir sind in der PAUSE und die Pause ist abgelaufen -> EINSCHALTEN
+  else if (!shownOn && (elapsedUs >= offTimeUs))
+  {
+    // Pixel füllen
     for (uint8_t w = 0; w < NUM_WINGS; ++w)
     {
       for (uint8_t i = 0; i < LEDS_PER_WING; i += 3)
@@ -76,25 +135,20 @@ void eff_Stroboskop()
         setWingPixel(w, i, CRGB::White);
       }
     }
-    FastLED.show();
+    FastLED.show(); // Schaltet die LEDs ein
+    shownOn = true;
+    lastStateChangeUs = nowUs; // Zeitstempel für den Blitz startet jetzt
 
-    strobeOn = true;
-    strobeOnAtUs = nowUs;
+    // RPM Zeitmessung
     if (lastFlashStartUs != 0)
     {
       gLastStrobePeriodUs = nowUs - lastFlashStartUs;
     }
     lastFlashStartUs = nowUs;
-    return;
   }
 
-  if (nowUs - strobeOnAtUs >= 1000UL)
-  {
-    FastLED.clear();
-    FastLED.show();
-    strobeOn = false;
-    lastOffAtMs = nowMs;
-  }
+  // Wenn keines von beiden zutrifft, tut diese Funktion absolut NICHTS.
+  // Das schont die CPU-Ressourcen extrem.
 }
 
 // 1. ENERGIE-WELLE (Schießt von innen nach außen)

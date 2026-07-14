@@ -80,6 +80,7 @@ namespace
   const unsigned long kConnectTimeoutMs = WIFI_CONNECT_TIMEOUT_MS;
   constexpr char kConfigPath[] = "/config.txt";
   constexpr size_t kMaxSignalBufferBytes = 128;
+  constexpr size_t kMaxSerialBytesPerLoop = 32;
   constexpr size_t kRawUartTailHexChars = 128;
   constexpr unsigned long kSignalFrameGapMs = 40;
   constexpr uint16_t kRemoteHeader = 0xAA55;
@@ -879,7 +880,8 @@ void setup()
 
 void loop()
 {
-  while (Serial.available())
+  size_t serialBytesProcessed = 0;
+  while (Serial.available() && serialBytesProcessed < kMaxSerialBytesPerLoop)
   {
     const char current = static_cast<char>(Serial.read());
     appendRawUartByte(static_cast<uint8_t>(current));
@@ -889,12 +891,15 @@ void loop()
       flushSignalBuffer();
     }
     lastSignalByteAtMs = millis();
+    ++serialBytesProcessed;
   }
 
   if (signalBuffer.length() > 0 && millis() - lastSignalByteAtMs > kSignalFrameGapMs)
   {
     flushSignalBuffer();
   }
+
+  updateLightEffect();
 
   setupOta();
   if (otaReady)
@@ -903,7 +908,7 @@ void loop()
   }
 
   webServer.handleClient();
-  updateLightEffect();
+  yield();
 
   if (scheduledRestartAtMs != 0 && millis() >= scheduledRestartAtMs)
   {
